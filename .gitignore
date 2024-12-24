@@ -74,6 +74,10 @@ web_modules/
 
 # dotenv environment variable files
 .env
+dist/
+.DS_Store
+*.log
+.idea/
 .env.development.local
 .env.test.local
 .env.production.local
