@@ -59,7 +59,7 @@ const appointmentController = {
                 return res.status(400).json({message: 'Appointment Not Available'});
             }
 
-            appointment.patient = req.user._id;;
+            appointment.patient = req.user._id;
             appointment.status = 'PENDING';
             await appointment.save();
 
@@ -69,7 +69,7 @@ const appointmentController = {
         }
     },
 
-    /** CHNAGE THE STATUS OF APPOINTMENT */
+    /** CHANGE THE STATUS OF APPOINTMENT */
     updateAppointmentStatus: async (req, res) => {
         try {
             if(req.user.role !== 'doctor') {
