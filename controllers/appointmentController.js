@@ -26,15 +26,37 @@ const appointmentController = {
 	/*GET ALL APPOINTMENTS*/
 	getAllAppointments: async (req, res) => {
 		try {
+			// Ensure user role and ID are defined
+			if (!req.user || !req.user._id || !req.user.role) {
+				return res.status(400).json({ message: "User information is missing" });
+			}
+
 			let appointments;
 
+			// Fetch appointments based on user role
 			if (req.user.role === "patient") {
 				appointments = await Appointment.find({
-					$or: [{ status: "FREE" }, { patient: req.user._id }],
+					$or: [
+						{ status: { $in: ["FREE", "PENDING"] } },
+						{ patient: req.user._id },
+					],
 				})
 					.populate("doctor", "name")
 					.populate("patient", "name")
 					.sort({ datetime: 1 });
+
+				// Adjust appointment status for patient role
+				appointments = appointments.map((apt) => {
+					const aptObj = apt.toObject();
+					if (
+						aptObj.status === "PENDING" &&
+						(!aptObj.patient ||
+							!aptObj.patient.some((p) => p._id.equals(req.user._id)))
+					) {
+						aptObj.status = "FREE";
+					}
+					return aptObj;
+				});
 			} else if (req.user.role === "doctor") {
 				appointments = await Appointment.find({
 					doctor: req.user._id,
@@ -43,20 +65,8 @@ const appointmentController = {
 					.populate("patient", "name")
 					.sort({ datetime: 1 });
 			}
-			console.log("PROSAOO BAJO", res);
-			if (req.user.role === "patient") {
-				appointments = appointments.map((apt) => {
-					const aptObj = apt.toObject();
-					if (
-						aptObj.patient?._id.toString() !== req.user._id.toString() &&
-						aptObj.status !== "APPROVED"
-					) {
-						aptObj.status = "FREE";
-					}
-					return aptObj;
-				});
-			}
 
+			// Return the appointments data
 			res.json(appointments);
 		} catch (error) {
 			res.status(500).json({ message: error.message });
@@ -72,20 +82,13 @@ const appointmentController = {
 			const appointment = await Appointment.findOneAndUpdate(
 				{
 					_id: req.params.id,
-					status: "FREE",
-					datetime: {
-						$nin: await Appointment.distinct("datetime", {
-							status: "APPROVED",
-						}),
-					},
+					status: { $in: ["FREE", "PENDING"] }, // Allow booking if status is FREE or PENDING
 				},
 				{
-					$set: {
-						patient: req.user._id,
-						status: "PENDING",
-					},
+					$addToSet: { patient: req.user._id }, // Add patient to the array without duplicates
+					$set: { status: "PENDING" }, // Update status to PENDING
 				},
-				{ new: true }
+				{ new: true } // Return the updated document
 			);
 
 			if (!appointment) {
