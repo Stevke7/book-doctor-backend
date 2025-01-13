@@ -28,34 +28,30 @@ const appointmentController = {
 		try {
 			let appointments;
 
-			if (req.user.role === 'patient') {
-				// Dohvati SVE termine
+			if (req.user.role === "patient") {
 				appointments = await Appointment.find({
-					status: { $ne: 'APPROVED' } // Dohvati sve osim APPROVED
+					$or: [{ status: "FREE" }, { patient: req.user._id }],
 				})
-					.populate('doctor', 'name')
-					.populate('patient', 'name')
+					.populate("doctor", "name")
+					.populate("patient", "name")
 					.sort({ datetime: 1 });
-
-			} else if (req.user.role === 'doctor') {
-				// Doktori vide sve svoje termine
+			} else if (req.user.role === "doctor") {
 				appointments = await Appointment.find({
-					doctor: req.user._id
+					doctor: req.user._id,
 				})
-					.populate('doctor', 'name')
-					.populate('patient', 'name')
+					.populate("doctor", "name")
+					.populate("patient", "name")
 					.sort({ datetime: 1 });
 			}
-
-			// Ako je pacijent, modificiraj prikaz statusa
-			if (req.user.role === 'patient') {
-				appointments = appointments.map(apt => {
+			console.log("PROSAOO BAJO", res);
+			if (req.user.role === "patient") {
+				appointments = appointments.map((apt) => {
 					const aptObj = apt.toObject();
-					// Ako termin nije od trenutnog korisnika i nije APPROVED,
-					// prikaži ga kao FREE
-					if (aptObj.patient?._id.toString() !== req.user._id.toString() &&
-						aptObj.status !== 'APPROVED') {
-						aptObj.status = 'FREE';
+					if (
+						aptObj.patient?._id.toString() !== req.user._id.toString() &&
+						aptObj.status !== "APPROVED"
+					) {
+						aptObj.status = "FREE";
 					}
 					return aptObj;
 				});
@@ -73,31 +69,29 @@ const appointmentController = {
 			if (req.user.role !== "patient") {
 				return res.status(403).json({ message: "Not authorized" });
 			}
-
-			// Jedna atomic operacija koja:
-			// 1. Pronalazi termin po ID-u
-			// 2. Provjerava da li je FREE
-			// 3. Provjerava da nije već APPROVED u to vrijeme
-			// 4. Ako sve prođe, odmah ga updatea
 			const appointment = await Appointment.findOneAndUpdate(
 				{
 					_id: req.params.id,
-					status: 'FREE',
+					status: "FREE",
 					datetime: {
-						$nin: await Appointment.distinct('datetime', { status: 'APPROVED' })
-					}
+						$nin: await Appointment.distinct("datetime", {
+							status: "APPROVED",
+						}),
+					},
 				},
 				{
 					$set: {
 						patient: req.user._id,
-						status: 'PENDING'
-					}
+						status: "PENDING",
+					},
 				},
-				{ new: true } // Vraća updatedani dokument
+				{ new: true }
 			);
 
 			if (!appointment) {
-				return res.status(400).json({ message: "This time slot is no longer available" });
+				return res
+					.status(400)
+					.json({ message: "This time slot is no longer available" });
 			}
 
 			res.json(appointment);
