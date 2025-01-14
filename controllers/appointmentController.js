@@ -30,31 +30,45 @@ const appointmentController = {
 
 			if (req.user.role === "patient") {
 				appointments = await Appointment.find({
-					$or: [{ status: "FREE" }, { patient: req.user._id }],
+					$or: [
+						{ status: "FREE" },
+						{ status: "PENDING" },
+						{ patient: req.user._id },
+					],
 				})
 					.populate("doctor", "name")
 					.populate("patient", "name")
 					.sort({ datetime: 1 });
+
+				appointments = appointments.map((apt) => {
+					const aptObj = apt.toObject();
+
+					// Check if the current user is in the patients array
+					const isPatient = aptObj.patient.some(
+						(patient) => patient._id.toString() === req.user._id.toString()
+					);
+
+					if (isPatient) {
+						// Set status to PENDING if the user has booked this appointment
+						aptObj.status =
+							aptObj.status === "APPROVED" ? "APPROVED" : "PENDING";
+					}
+
+					return aptObj;
+				});
 			} else if (req.user.role === "doctor") {
 				appointments = await Appointment.find({
 					doctor: req.user._id,
+					$or: [
+						{ status: "PENDING" },
+						{ status: "APPROVED" },
+						{ status: "FREE" },
+						{ status: "REJECTED" },
+					],
 				})
 					.populate("doctor", "name")
 					.populate("patient", "name")
 					.sort({ datetime: 1 });
-			}
-			console.log("PROSAOO BAJO", res);
-			if (req.user.role === "patient") {
-				appointments = appointments.map((apt) => {
-					const aptObj = apt.toObject();
-					if (
-						aptObj.patient?._id.toString() !== req.user._id.toString() &&
-						aptObj.status !== "APPROVED"
-					) {
-						aptObj.status = "FREE";
-					}
-					return aptObj;
-				});
 			}
 
 			res.json(appointments);
@@ -69,24 +83,16 @@ const appointmentController = {
 			if (req.user.role !== "patient") {
 				return res.status(403).json({ message: "Not authorized" });
 			}
-			const appointment = await Appointment.findOneAndUpdate(
-				{
-					_id: req.params.id,
-					status: "FREE",
-					datetime: {
-						$nin: await Appointment.distinct("datetime", {
-							status: "APPROVED",
-						}),
-					},
+			const appointment = await Appointment.findOne({
+				_id: req.params.id,
+				$or: [
+					{ status: "FREE" }, // Appointment is available
+					{ status: "PENDING" }, // Appointment is already reserved but not approved
+				],
+				datetime: {
+					$nin: await Appointment.distinct("datetime", { status: "APPROVED" }), // Ensure the time is not already approved
 				},
-				{
-					$set: {
-						patient: req.user._id,
-						status: "PENDING",
-					},
-				},
-				{ new: true }
-			);
+			});
 
 			if (!appointment) {
 				return res
@@ -94,7 +100,16 @@ const appointmentController = {
 					.json({ message: "This time slot is no longer available" });
 			}
 
-			res.json(appointment);
+			const updatedAppointment = await Appointment.findOneAndUpdate(
+				{ _id: req.params.id },
+				{
+					$addToSet: { patient: { _id: req.user._id, name: req.user.name } }, // Add current user to patients array
+					$set: { status: "PENDING" }, // Ensure status is PENDING for the current user
+				},
+				{ new: true }
+			);
+
+			return res.json(updatedAppointment);
 		} catch (error) {
 			res.status(400).json({ error: error.message });
 		}
