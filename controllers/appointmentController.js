@@ -1,7 +1,7 @@
 const Appointment = require("../models/Appointment");
 
 const appointmentController = {
-	//Create appointment but only for doctors
+	/*CREATE A FREE APPOINTMENT JUST FOR DOCTOR */
 	createAppointment: async (req, res) => {
 		try {
 			if (req.user.role !== "doctor") {
@@ -12,6 +12,7 @@ const appointmentController = {
 				datetime: new Date(req.body.datetime),
 				status: "FREE",
 				doctor: req.user._id,
+				events: [],
 			});
 
 			await appointment.save();
@@ -30,7 +31,7 @@ const appointmentController = {
 
 			if (req.user.role === "patient") {
 				appointments = await Appointment.find({
-					$or: [{ status: "FREE" }, { patient: req.user._id }],
+					$or: [{ status: "FREE" }, { "events.patient": req.user._id }],
 				})
 					.populate("doctor", "name")
 					.populate("patient", "name")
@@ -41,20 +42,11 @@ const appointmentController = {
 				})
 					.populate("doctor", "name")
 					.populate("patient", "name")
+					.populate({
+						path: "events.patient",
+						select: "name",
+					})
 					.sort({ datetime: 1 });
-			}
-			console.log("PROSAOO BAJO", res);
-			if (req.user.role === "patient") {
-				appointments = appointments.map((apt) => {
-					const aptObj = apt.toObject();
-					if (
-						aptObj.patient?._id.toString() !== req.user._id.toString() &&
-						aptObj.status !== "APPROVED"
-					) {
-						aptObj.status = "FREE";
-					}
-					return aptObj;
-				});
 			}
 
 			res.json(appointments);
@@ -69,24 +61,11 @@ const appointmentController = {
 			if (req.user.role !== "patient") {
 				return res.status(403).json({ message: "Not authorized" });
 			}
-			const appointment = await Appointment.findOneAndUpdate(
-				{
-					_id: req.params.id,
-					status: "FREE",
-					datetime: {
-						$nin: await Appointment.distinct("datetime", {
-							status: "APPROVED",
-						}),
-					},
-				},
-				{
-					$set: {
-						patient: req.user._id,
-						status: "PENDING",
-					},
-				},
-				{ new: true }
-			);
+
+			const appointment = await Appointment.findOne({
+				_id: req.params.id,
+				status: "FREE",
+			});
 
 			if (!appointment) {
 				return res
@@ -94,7 +73,29 @@ const appointmentController = {
 					.json({ message: "This time slot is no longer available" });
 			}
 
-			res.json(appointment);
+			const isAlreadyBooked = appointment.events.some(
+				(event) => event.patient.toString() === req.user._id.toString()
+			);
+
+			if (isAlreadyBooked) {
+				return res
+					.status(400)
+					.json({ message: "You have already booked this appointment" });
+			}
+
+			const newEvent = {
+				patient: req.user._id,
+				status: "PENDING",
+			};
+
+			appointment.events.push(newEvent);
+
+			await appointment.save();
+
+			res.json({
+				message: "Appointment booked successfully",
+				appointment,
+			});
 		} catch (error) {
 			res.status(400).json({ error: error.message });
 		}
@@ -106,24 +107,45 @@ const appointmentController = {
 			if (req.user.role !== "doctor") {
 				return res.status(403).json({ message: "Not authorized" });
 			}
-			const { status } = req.body;
+			const { status, eventId } = req.body;
 			const appointment = await Appointment.findById(req.params.id);
+
+			console.log("APPOINTMENT", appointment, eventId);
 
 			if (!appointment) {
 				return res.status(403).json({ message: "Appointment Not Found" });
 			}
-			if (status === "APPROVED") {
-				await Appointment.updateMany(
-					{
-						_id: { $ne: appointment._id },
-						datetime: appointment.datetime,
-						status: "PENDING",
-					},
-					{ status: "REJECTED" }
-				);
+
+			const event = appointment.events.id(eventId);
+
+			if (!event) {
+				return res.status(404).json({ message: "Event not found" });
 			}
 
-			appointment.status = status;
+			if (status === "APPROVED") {
+				appointment.status = "BOOKED";
+				await Appointment.updateMany(
+					{
+						datetime: appointment.datetime,
+						"events.status": "PENDING",
+					},
+					{
+						$set: { "events.$[pendingEvent].status": "REJECTED" },
+					},
+					{
+						arrayFilters: [
+							{
+								"pendingEvent._id": { $ne: eventId },
+								"pendingEvent.status": "PENDING",
+							},
+						],
+					}
+				);
+			} else {
+				appointment.status = "FREE";
+			}
+
+			event.status = status;
 			await appointment.save();
 
 			res.json(appointment);
