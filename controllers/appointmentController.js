@@ -110,8 +110,6 @@ const appointmentController = {
 			const { status, eventId } = req.body;
 			const appointment = await Appointment.findById(req.params.id);
 
-			console.log("APPOINTMENT", appointment, eventId);
-
 			if (!appointment) {
 				return res.status(403).json({ message: "Appointment Not Found" });
 			}

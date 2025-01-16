@@ -49,7 +49,6 @@ const userController = {
 	},
 
 	login: async (req, res) => {
-		console.log("LOGIN REQ ", req.body);
 		try {
 			const { email, password } = req.body;
 
