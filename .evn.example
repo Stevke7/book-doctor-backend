@@ -1,0 +1,8 @@
+# Server port
+PORT=5000
+
+# MongoDB connection string
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster-url>/<database-name>?retryWrites=true&w=majority&appName=<app-name>
+
+# JWT secret key
+JWT_SECRET=<your-secret-key>
