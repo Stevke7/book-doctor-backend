@@ -9,7 +9,14 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+const corsOptions = {
+	origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+	methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+	credentials: true,
+	optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use("/api/users", userRoutes);
 app.use("/api/appointments", appointmentRoutes);
