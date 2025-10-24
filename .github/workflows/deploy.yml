@@ -1,0 +1,25 @@
+name: Deploy to Hetzner Cloud
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via ssh
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.HETZNER_IP }}
+          username: zemo69
+          key: ${{ secrets.HC_SSH_KEY }}
+          script: |
+            cd /var/www/bookdoctor/book-doctor-backend
+            git pull origin main
+            npm install --production
+            pm2 restart bookdoctor
