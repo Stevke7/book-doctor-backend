@@ -19,7 +19,9 @@ jobs:
           username: zemo69
           key: ${{ secrets.HC_SSH_KEY }}
           script: |
-            cd /var/www/bookdoctor/book-doctor-backend
-            git pull origin main
-            npm install --production
-            pm2 restart bookdoctor
+            ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no zemo69@${{ secrets.HC_HETZNER_IP }} << 'EOF'
+             cd /var/www/bookdoctor/book-doctor-backend
+             git pull origin main
+             npm install --production
+             pm2 restart bookdoctor
+             EOF
