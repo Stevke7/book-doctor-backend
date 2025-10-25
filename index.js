@@ -22,11 +22,15 @@ app.use("/api/users", userRoutes);
 app.use("/api/appointments", appointmentRoutes);
 
 mongoose
-	.connect(process.env.MONGODB_URI)
+	.connect(process.env.MONGODB_URI, {
+		useNewUrlParser: true,
+		useUnifiedTopology: true,
+		serverSelectionTimeoutMS: 5000,
+		socketTimeoutMS: 45000,
+	})
 	.then(() => console.log("Connected to DB"))
 	.catch((err) => {
-		console.log(err);
-		process.exit(1);
+		console.error("Mongo DB connection error", err);
 	});
 
 mongoose.connection.on("error", (err) => {
@@ -37,7 +41,6 @@ mongoose.connection.on("disconnected", () => {
 });
 mongoose.connection.on("SIGINT", async () => {
 	await mongoose.connection.close();
-	process.exit(0);
 });
 app.get("/", (req, res) => {
 	res.send("Backend works");
