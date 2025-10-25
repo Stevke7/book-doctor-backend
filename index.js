@@ -35,7 +35,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
-app.use("/api/users", userRoutes);
+app.use("/users", userRoutes);
 app.use("/api/appointments", appointmentRoutes);
 
 mongoose
