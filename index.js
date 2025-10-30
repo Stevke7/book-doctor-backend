@@ -36,7 +36,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use("/users", userRoutes);
-app.use("/api/appointments", appointmentRoutes);
+app.use("/appointments", appointmentRoutes);
 
 mongoose
 	.connect(process.env.MONGODB_URI, {
