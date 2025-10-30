@@ -19,7 +19,7 @@ jobs:
           username: zemo69
           key: ${{ secrets.HC_SSH_KEY }}
           script: |
-            cd /var/www/bookdoctor/book-doctor-backend
+            cd /home/zemo69/var/www/bookdoctor/book-doctor-backend
             git pull origin main
             npm install --production
             pm2 restart bookdoctor
