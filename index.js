@@ -8,6 +8,7 @@ require("dotenv").config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+const host = process.env.HOST;
 
 const allowedOrigins = [
 	"http://localhost:3000",
@@ -63,6 +64,6 @@ app.get("/", (req, res) => {
 	res.send("Backend works");
 });
 
-app.listen(port, () => {
-	console.log(`Server running on port: ${port}`);
+app.listen(port, host, () => {
+	console.log(`Server running on port: ${port} and host: ${host}`);
 });
